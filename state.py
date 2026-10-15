@@ -1,12 +1,13 @@
-from typing import TypedDict, List, Dict, Any
+
+from typing import Any
+from langgraph.graph import MessagesState
 
 
-class K12State(TypedDict, total=False):
+class K12State(MessagesState, total=False):
     
+    """State shared across the K12 research graph."""
+
     query: str
-    
-    search_params: Dict[str, Any]
-    
-    search_results: List[Dict[str, Any]]
-    
-    events: List[Dict[str, Any]]
+    search_results: list[dict[str, Any]]
+    events: list[dict[str, Any]]
+    response: str

@@ -1,70 +1,104 @@
-from dotenv import load_dotenv 
-from pathlib import Path 
+
+from typing import Optional
+from pydantic import BaseModel, Field
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from models.schemas import K12Event
+import logging
+
+logger = logging.getLogger(__name__)
+
+class K12Event(BaseModel):
+
+    title: str
+
+    organization: Optional[str] = None
+
+    event_type: Optional[str] = None
+
+    date: Optional[str] = None
+
+    location: Optional[str] = None
+
+    description: Optional[str] = None
+
+    source_url: str
 
 
-path = Path(__file__).parents[1] / ".env"
-load_dotenv(path)
+class K12Events(BaseModel):
+
+    events: list[K12Event] = Field(default_factory=list)
+
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
-    temperature=0
+    temperature=0,
 )
 
-extractor = llm.with_structured_output(
-    K12Event
-)
+extractor = llm.with_structured_output(K12Events)
 
 
 def extract_events(state):
 
-    results = state["search_results"]
+    results = state.get("search_results", [])
 
-    events = []
+    if not results:
+        return {"events": []}
 
-    for result in results:
+    documents = []
 
-        content = result.get("content", "")
+    for i, result in enumerate(results):
 
-        url = result.get("url", "")
+        documents.append(
+            f"""
+                RESULT {i + 1}
 
-        if not content:
-            continue
+                TITLE:
+                {result["title"]}
 
-        prompt = f"""
-You are a K12 intelligence extraction system.
+                URL:
+                {result["url"]}
 
-Determine whether the following web result contains
-useful information about a K12 event, partnership,
-announcement, conference, organization activity, or
-other relevant K12 development.
+                CONTENT:
+                {result["content"]}
+            """
+        )
 
-If it is relevant, extract the information.
+    combined = "\n".join(documents)
 
-If it is not relevant, do not create an event.
+    prompt = f"""
+        Extract relevant K12 events and developments from these
+        web search results.
 
-URL:
-{url}
+        Only include information explicitly present in the results.
 
-CONTENT:
-{content}
-"""
+        Do not invent information.
 
-        try:
+        Relevant items can include:
+        - K12 partnerships
+        - school partnerships
+        - education conferences
+        - school events
+        - education programs
+        - announcements
+        - K12 organizations
+        - important K12 developments
 
-            event = extractor.invoke(prompt)
+        WEB RESULTS:
 
-            event_data = event.model_dump()
+        {combined}
+    """
 
-            event_data["source_url"] = url
+    try:
+        response = extractor.invoke(prompt)
 
-            events.append(event_data)
-
-        except Exception:
-            continue
-
-    return {
-        "events": events
-    }
+        logger.info("Events extracted successfully")
+        return {
+            "events": [
+                event.model_dump()
+                for event in response.events
+            ]
+        }
+    except Exception:
+        logger.exception("Event extraction failed")
+        raise
