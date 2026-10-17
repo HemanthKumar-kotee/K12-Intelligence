@@ -57,6 +57,19 @@ def init_db():
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+            session_id UUID PRIMARY KEY,
+            user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+            token_hash CHAR(64) NOT NULL UNIQUE,
+            expires_at TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_auth_sessions_user
+        ON auth_sessions(user_id)
+        """,
+        """
         CREATE TABLE IF NOT EXISTS conversations (
             conversation_id UUID PRIMARY KEY,
             user_id UUID REFERENCES users(user_id)
@@ -79,6 +92,14 @@ def init_db():
         )
         """,
         """
+        ALTER TABLE chat_messages
+        ADD COLUMN IF NOT EXISTS events JSONB
+        """,
+        """
+        ALTER TABLE chat_messages
+        ADD COLUMN IF NOT EXISTS sources JSONB
+        """,
+        """
         CREATE INDEX IF NOT EXISTS idx_conversations_user
         ON conversations(user_id)
         """,
@@ -96,6 +117,7 @@ def init_db():
 
 
 def handleSignUp(email: str, password: str):
+    
     email = email.strip().lower()
     user_id = uuid.uuid4()
     hashed_password = password_hash.hash(password)
@@ -148,12 +170,75 @@ def handleLogin(email: str, password: str):
 
 
 
+def create_session(user_id: str, token_hash: str, expires_at):
+    
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO auth_sessions (session_id, user_id, token_hash, expires_at)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (uuid.uuid4(), user_id, token_hash, expires_at),
+        )
+
+
+def get_user_by_session_hash(token_hash: str):
+    
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT u.user_id, u.email
+            FROM auth_sessions s
+            JOIN users u ON u.user_id = s.user_id
+            WHERE s.token_hash = %s AND s.expires_at > NOW()
+            """,
+            (token_hash,),
+        ).fetchone()
+    if row:
+        return {"user_id": str(row["user_id"]), "email": row["email"]}
+    return None
+
+
+def delete_session(token_hash: str):
+    
+    with get_connection() as conn:
+        conn.execute("DELETE FROM auth_sessions WHERE token_hash = %s", (token_hash,))
+
+
+def fetch_conversation_for_user(conversation_id: str, user_id: str):
+    
+    with get_connection() as conn:
+    
+        return conn.execute(
+            """
+            SELECT * FROM conversations
+            WHERE conversation_id = %s AND user_id = %s
+            """,
+            (conversation_id, user_id),
+        ).fetchone()
+
+
+def delete_conversation_for_user(conversation_id: str, user_id: str):
+    
+    with get_connection() as conn:
+    
+        cursor = conn.execute(
+            """
+            DELETE FROM conversations
+            WHERE conversation_id = %s AND user_id = %s
+            """,
+            (conversation_id, user_id),
+        )
+        return cursor.rowcount > 0
+
+
 def create_conversation(
     conversation_id: str,
     user_id: str | None = None,
     title: str = "New conversation",
 ):
     with get_connection() as conn:
+        
         conn.execute(
             """
             INSERT INTO conversations
@@ -165,7 +250,9 @@ def create_conversation(
 
 
 def fetch_conversations(user_id: str | None = None):
+    
     with get_connection() as conn:
+    
         if user_id is None:
             rows = conn.execute(
                 """
@@ -175,6 +262,7 @@ def fetch_conversations(user_id: str | None = None):
                 ORDER BY updated_at DESC
                 """
             ).fetchall()
+        
         else:
             rows = conn.execute(
                 """
@@ -190,7 +278,9 @@ def fetch_conversations(user_id: str | None = None):
 
 
 def fetch_conversation(conversation_id: str):
+    
     with get_connection() as conn:
+    
         row = conn.execute(
             """
             SELECT *
@@ -205,7 +295,9 @@ def fetch_conversation(conversation_id: str):
 
 
 def fetch_messages(conversation_id: str):
+    
     with get_connection() as conn:
+    
         rows = conn.execute(
             """
             SELECT *
@@ -228,7 +320,9 @@ def insert_message(
     sources=None
 ):
     with get_connection() as conn:
+        
         if role == 'assistant':
+        
             conn.execute(
                         """
                         INSERT INTO chat_messages
@@ -265,7 +359,9 @@ def insert_message(
 
 
 def delete_conversation(conversation_id: str):
+    
     with get_connection() as conn:
+    
         cursor = conn.execute(
             """
             DELETE FROM conversations
