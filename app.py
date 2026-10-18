@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres import PostgresSaver
 from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 
 from logging_config import setup_logging
 from graph import build_graph, CHECKPOINTER_URL
@@ -76,6 +77,7 @@ app.add_middleware(
 
 
 class CredentialRequest(BaseModel):
+    name: Optional[str] = None
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
 
@@ -190,18 +192,26 @@ def home():
 
 @app.post("/signup", status_code=201)
 def signup(credentials: CredentialRequest, response: Response):
-    
-    user = handleSignUp(credentials.email, credentials.password)
-    
-    if user is None:
-        raise HTTPException(
-            status_code=409,
-            detail="An account with this email already exists.",
-        )
-    
-    _set_session_cookie(response, user["user_id"])
-    return {"message": "Successfully signed up", **user}
 
+    userName = credentials.name 
+
+    print(userName)
+    if userName is not None:
+        user = handleSignUp(credentials.name, credentials.email, credentials.password)
+
+        if user is None:
+            raise HTTPException(
+                status_code=409,
+                detail="An account with this email already exists.",
+            )
+        
+        _set_session_cookie(response, user["user_id"])
+        return {"message": "Successfully signed up", **user}
+    else:
+
+        raise HTTPException(
+            status_code=400
+        )
 
 @app.post("/login")
 def login(credentials: CredentialRequest, response: Response):
@@ -230,18 +240,22 @@ def logout(request: Request, response: Response, user=Depends(get_current_user))
     if token:
         delete_session(_token_hash(token))
     _clear_session_cookie(response)
-    
+
+    logger.info("User logged out successfully")
+
     return {"message": "Logged out successfully"}
 
 
 @app.post("/chat")
-def chat(chat_request: ChatRequest, request: Request, user=Depends(get_current_user)):
+def chat( 
+    chatRequest: ChatRequest,
+    request: Request,
+    user=Depends(get_current_user)):
     
     require_same_origin(request)
-    
-    thread_id = chat_request.thread_id
-    message = chat_request.message.strip()
-    
+
+    thread_id = chatRequest.thread_id
+    message = chatRequest.message
     if not message:
     
         raise HTTPException(status_code=422, detail="Message cannot be empty.")
@@ -251,7 +265,9 @@ def chat(chat_request: ChatRequest, request: Request, user=Depends(get_current_u
 
     try:
         result = app.state.graph.invoke(
-            {"query": message},
+            {
+                "query": message
+            },
             config={"configurable": {"thread_id": thread_id}},
         )
     

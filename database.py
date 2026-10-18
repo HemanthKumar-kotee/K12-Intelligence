@@ -92,6 +92,10 @@ def init_db():
         )
         """,
         """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS username VARCHAR(100) NOT NULL
+        """,
+        """
         ALTER TABLE chat_messages
         ADD COLUMN IF NOT EXISTS events JSONB
         """,
@@ -116,8 +120,9 @@ def init_db():
     logger.info("Initializing database")
 
 
-def handleSignUp(email: str, password: str):
-    
+def handleSignUp(name: str, email: str, password: str):
+
+    name = name.strip().lower()
     email = email.strip().lower()
     user_id = uuid.uuid4()
     hashed_password = password_hash.hash(password)
@@ -127,10 +132,10 @@ def handleSignUp(email: str, password: str):
             conn.execute(
                 """
                 INSERT INTO users
-                    (user_id, email, password_hash)
-                VALUES (%s, %s, %s)
+                    (user_id, username, email, password_hash)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (user_id, email, hashed_password),
+                (user_id, name, email, hashed_password),
             )
         
         return {

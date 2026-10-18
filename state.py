@@ -11,3 +11,4 @@ class K12State(MessagesState, total=False):
     search_results: list[dict[str, Any]]
     events: list[dict[str, Any]]
     response: str
+    file_context: str
