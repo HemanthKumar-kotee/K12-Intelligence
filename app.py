@@ -37,12 +37,9 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 FRONTEND_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "FRONTEND_ORIGINS",
-        "http://localhost:8080,http://localhost:5173",
-    ).split(",")
-    if origin.strip()
+    os.getenv("FRONTEND_ORIGINS"),
+    "http://localhost:8080", 
+    "http://localhost:5173"
 ]
 
 SESSION_COOKIE_NAME = "k12_session"
@@ -108,7 +105,7 @@ def _set_session_cookie(response: Response, user_id: str) -> None:
         max_age=int(SESSION_DURATION.total_seconds()),
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite="none",
         path="/",
     )
 
@@ -120,7 +117,7 @@ def _clear_session_cookie(response: Response) -> None:
         path="/",
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite="none",
     )
 
 
