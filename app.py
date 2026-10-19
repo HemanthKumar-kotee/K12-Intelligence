@@ -44,7 +44,7 @@ FRONTEND_ORIGINS = [
 
 SESSION_COOKIE_NAME = "k12_session"
 SESSION_DURATION = timedelta(days=7)
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+COOKIE_SECURE = True
 
 
 @asynccontextmanager
