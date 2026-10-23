@@ -36,7 +36,7 @@ def otp_hash_matches(expected_hash: str, supplied_hash: str) -> bool:
 
 def send_otp_email(to_email: str, otp: str) -> None:
     """Send a verification OTP using SMTP configuration from environment."""
-    host = os.getenv("SMTP_HOST")
+    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     username = os.getenv("SMTP_USERNAME")
     password = os.getenv("SMTP_PASSWORD")
     sender = os.getenv("SMTP_FROM") or username
