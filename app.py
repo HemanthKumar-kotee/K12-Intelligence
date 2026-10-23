@@ -43,9 +43,17 @@ logger = logging.getLogger(__name__)
 
 def _configured_origins() -> list[str]:
     
-    origins = os.getenv("FRONTEND_ORIGIN", "http://localhost:8080")
-    return list(dict.fromkeys(origins))
-
+    origins = os.getenv(
+        "FRONTEND_ORIGIN",
+        "http://localhost:8080",
+    )
+    return list(
+        dict.fromkeys(
+            origin.strip().rstrip("/")
+            for origin in origins.split(",")
+            if origin.strip()
+        )
+    )
 
 FRONTEND_ORIGINS = _configured_origins()
 SESSION_COOKIE_NAME = "k12_session"
