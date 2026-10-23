@@ -12,7 +12,6 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres import PostgresSaver
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional
 from pwdlib import PasswordHash
 
 from logging_config import setup_logging
